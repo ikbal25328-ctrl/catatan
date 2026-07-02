@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Pencatat Hutang v2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans p-6">
+
+    <div class="max-w-5xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">📝 Pencatat Hutang Digital (Fleksibel)</h1>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-xl shadow-md h-fit">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">Tambah Catatan</h2>
+                <form id="debtForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600">Nama</label>
+                        <input type="text" id="name" required class="w-full mt-1 p-2 border rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600">Detail Hutang</label>
+                        <input type="text" id="debtDetail" required class="w-full mt-1 p-2 border rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none" placeholder="Contoh: Gula 5kg atau 50000">
+                        <p class="text-xs text-gray-400 mt-1">*Bisa diisi uang maupun barang belanjaan.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600">Alamat</label>
+                        <textarea id="address" required rows="3" class="w-full mt-1 p-2 border rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none"></textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700 transition duration-200">
+                        Simpan Catatan
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-md lg:col-span-2 flex flex-col">
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Cari Catatan</label>
+                    <input type="text" id="searchInput" class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none placeholder-gray-400" placeholder="Ketik nama atau alamat untuk mencari...">
+                </div>
+
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-700">Daftar Hutang</h2>
+                    <span class="text-sm font-medium text-gray-500">Total Data: <span id="totalPeople" class="text-blue-600 font-bold">0</span></span>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200 text-gray-600 text-sm uppercase">
+                                <th class="p-3">Nama</th>
+                                <th class="p-3">Hutang/Barang</th>
+                                <th class="p-3">Alamat</th>
+                                <th class="p-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="debtTableBody" class="text-gray-700 divide-y divide-gray-100">
+                            </tbody>
+                    </table>
+                </div>
+                
+                <div id="emptyMessage" class="text-center py-8 text-gray-400 hidden">
+                    Tidak ada catatan hutang yang cocok atau tersedia.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mengambil elemen DOM
+        const debtForm = document.getElementById('debtForm');
+        const nameInput = document.getElementById('name');
+        const debtDetailInput = document.getElementById('debtDetail');
+        const addressInput = document.getElementById('address');
+        const debtTableBody = document.getElementById('debtTableBody');
+        const totalPeopleContainer = document.getElementById('totalPeople');
+        const emptyMessage = document.getElementById('emptyMessage');
+        const searchInput = document.getElementById('searchInput');
+
+        // Mengambil data dari LocalStorage
+        let debtList = JSON.parse(localStorage.getItem('debtList')) || [];
+
+        // Fungsi otomatis format angka ke Rupiah JIKA inputnya murni angka
+        function formatHutang(value) {
+            // Cek apakah input murni angka dan tidak kosong
+            if (!isNaN(value) && value.trim() !== '') {
+                return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
+            }
+            // Jika mengandung huruf (seperti "Gula 5kg"), biarkan teks apa adanya
+            return value;
+        }
+
+        // Fungsi untuk merender data ke dalam tabel (Mendukung Filter Pencarian)
+        function renderData(filterText = '') {
+            debtTableBody.innerHTML = '';
+            
+            // Filter data berdasarkan Nama atau Alamat sesuai input pencarian
+            const filteredList = debtList.filter(item => {
+                const searchLower = filterText.toLowerCase();
+                return item.name.toLowerCase().includes(searchLower) || 
+                       item.address.toLowerCase().includes(searchLower);
+            });
+            
+            if (filteredList.length === 0) {
+                emptyMessage.classList.remove('hidden');
+            } else {
+                emptyMessage.classList.add('hidden');
+                
+                filteredList.forEach((item) => {
+                    // Mencari index asli di array utama untuk keperluan hapus data
+                    const originalIndex = debtList.indexOf(item);
+                    
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-50 transition';
+                    row.innerHTML = `
+                        <td class="p-3 font-medium text-gray-900">${item.name}</td>
+                        <td class="p-3 text-amber-700 font-semibold">${formatHutang(item.debtDetail)}</td>
+                        <td class="p-3 text-sm text-gray-500 max-w-xs truncate">${item.address}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="deleteDebt(${originalIndex})" class="text-sm bg-red-100 hover:bg-red-200 text-red-600 font-medium py-1 px-3 rounded-md transition duration-150">
+                                Lunas / Hapus
+                            </button>
+                        </td>
+                    `;
+                    debtTableBody.appendChild(row);
+                });
+            }
+            
+            // Update total data yang tampil sesuai filter
+            totalPeopleContainer.textContent = filteredList.length;
+            
+            // Selalu simpan array utama ke LocalStorage setiap ada perubahan data asli
+            localStorage.setItem('debtList', JSON.stringify(debtList));
+        }
+
+        // Fungsi menambah data baru
+        debtForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const newDebt = {
+                name: nameInput.value.trim(),
+                debtDetail: debtDetailInput.value.trim(), // Mengambil teks/angka bebas
+                address: addressInput.value.trim()
+            };
+
+            debtList.push(newDebt);
+            
+            // Reset input pencarian saat menambah data baru agar data langsung terlihat
+            searchInput.value = '';
+            renderData();
+
+            // Reset Form input
+            debtForm.reset();
+            nameInput.focus();
+        });
+
+        // Fitur Pencarian saat mengetik (Event Listener)
+        searchInput.addEventListener('input', function(e) {
+            renderData(e.target.value);
+        });
+
+        // Fungsi menghapus data (Lunas)
+        function deleteDebt(index) {
+            if (confirm('Apakah Anda yakin ingin menghapus catatan ini?')) {
+                debtList.splice(index, 1);
+                // Render ulang dengan membawa nilai pencarian yang sedang aktif
+                renderData(searchInput.value);
+            }
+        }
+
+        // Render pertama kali saat web dibuka
+        renderData();
+    </script>
+</body>
+</html>
